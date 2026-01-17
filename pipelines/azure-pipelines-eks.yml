@@ -1,0 +1,41 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  AWS_REGION: us-east-1
+  CLUSTER_NAME: eks-sample-cluster
+  ECR_REPO: eks-sample-app
+
+steps:
+- checkout: self
+
+# Build & Push Docker Image
+- task: Docker@2
+  displayName: Build and Push Image to ECR
+  inputs:
+    containerRegistry: ecr-docker-connection
+    repository: $(ECR_REPO)
+    command: buildAndPush
+    Dockerfile: docker/Dockerfile
+    tags: |
+      latest
+
+# Configure kubectl for EKS
+- task: AWSCLI@1
+  displayName: Configure kubeconfig
+  inputs:
+    awsCredentials: aws-eks-connection
+    regionName: $(AWS_REGION)
+    awsCommand: eks
+    awsSubCommand: update-kubeconfig
+    awsArguments: >
+      --name $(CLUSTER_NAME)
+
+# Deploy to Kubernetes
+- script: |
+    kubectl apply -f k8s/deployment.yaml
+    kubectl apply -f k8s/service.yaml
+  displayName: Deploy to EKS
