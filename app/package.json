@@ -1,0 +1,12 @@
+{
+  "name": "eks-sample-app",
+  "version": "1.0.0",
+  "description": "Node.js app deployed to EKS via Azure DevOps",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
