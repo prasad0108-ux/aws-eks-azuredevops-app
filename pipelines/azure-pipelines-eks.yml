@@ -25,40 +25,33 @@ steps:
     inlineScript: |
       set -e
 
-      echo "Logging in to Amazon ECR"
       aws ecr get-login-password --region $(AWS_REGION) \
       | docker login --username AWS --password-stdin \
         $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-      echo "Building Docker image"
       docker build -t $(ECR_REPO):latest -f docker/Dockerfile .
-
-      echo "Tagging Docker image"
       docker tag $(ECR_REPO):latest \
         $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest
-
-      echo "Pushing Docker image to ECR"
       docker push \
         $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest
 
 # =====================================================
-# 2️⃣ Configure kubectl for EKS (AWS OFFICIAL METHOD)
+# 2️⃣ Configure kubectl & Deploy to EKS
 # =====================================================
-- task: AWSCLI@1
-  displayName: Configure kubeconfig for EKS
+- task: AWSShellScript@1
+  displayName: Configure kubeconfig & Deploy to EKS
   inputs:
     awsCredentials: aws-eks-connection
     regionName: $(AWS_REGION)
-    awsCommand: eks
-    awsSubCommand: update-kubeconfig
-    awsArguments: >
-      --name $(CLUSTER_NAME)
-      --region $(AWS_REGION)
+    scriptType: inline
+    inlineScript: |
+      set -e
 
-# =====================================================
-# 3️⃣ Deploy Kubernetes manifests
-# =====================================================
-- script: |
-    kubectl apply -f k8s/deployment.yaml
-    kubectl apply -f k8s/service.yaml
-  displayName: Deploy application to EKS
+      aws sts get-caller-identity
+      aws eks update-kubeconfig \
+        --name $(CLUSTER_NAME) \
+        --region $(AWS_REGION)
+
+      kubectl get nodes
+      kubectl apply -f k8s/deployment.yaml
+      kubectl apply -f k8s/service.yaml
