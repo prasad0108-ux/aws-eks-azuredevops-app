@@ -6,26 +6,46 @@ pool:
 
 variables:
   AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: 593793022607
   CLUSTER_NAME: eks-sample-cluster
   ECR_REPO: eks-sample-app
 
 steps:
 - checkout: self
 
-# Build & Push Docker Image
-- task: Docker@2
+# =====================================================
+# 1️⃣ Build & Push Docker Image to Amazon ECR
+# =====================================================
+- task: AWSShellScript@1
   displayName: Build and Push Image to ECR
   inputs:
-    containerRegistry: ecr-docker-connection
-    repository: $(ECR_REPO)
-    command: buildAndPush
-    Dockerfile: docker/Dockerfile
-    tags: |
-      latest
+    awsCredentials: aws-eks-connection
+    regionName: $(AWS_REGION)
+    scriptType: inline
+    inlineScript: |
+      set -e
 
-# Configure kubectl for EKS
+      echo "Logging in to Amazon ECR"
+      aws ecr get-login-password --region $AWS_REGION \
+      | docker login --username AWS --password-stdin \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      echo "Building Docker image"
+      docker build -t $ECR_REPO:latest -f docker/Dockerfile .
+
+      echo "Tagging Docker image"
+      docker tag $ECR_REPO:latest \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+
+      echo "Pushing Docker image to ECR"
+      docker push \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+
+# =====================================================
+# 2️⃣ Configure kubectl for EKS (AWS official way)
+# =====================================================
 - task: AWSCLI@1
-  displayName: Configure kubeconfig
+  displayName: Configure kubeconfig for EKS
   inputs:
     awsCredentials: aws-eks-connection
     regionName: $(AWS_REGION)
@@ -34,8 +54,10 @@ steps:
     awsArguments: >
       --name $(CLUSTER_NAME)
 
-# Deploy to Kubernetes
+# =====================================================
+# 3️⃣ Deploy Kubernetes manifests
+# =====================================================
 - script: |
     kubectl apply -f k8s/deployment.yaml
     kubectl apply -f k8s/service.yaml
-  displayName: Deploy to EKS
+  displayName: Deploy application to EKS
