@@ -5,7 +5,7 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  AWS_REGION: us-east-1
+  AWS_REGION: af-south-1
   AWS_ACCOUNT_ID: 593793022607
   CLUSTER_NAME: eks-sample-cluster
   ECR_REPO: eks-sample-app
@@ -26,23 +26,23 @@ steps:
       set -e
 
       echo "Logging in to Amazon ECR"
-      aws ecr get-login-password --region $AWS_REGION \
+      aws ecr get-login-password --region $(AWS_REGION) \
       | docker login --username AWS --password-stdin \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+        $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
       echo "Building Docker image"
-      docker build -t $ECR_REPO:latest -f docker/Dockerfile .
+      docker build -t $(ECR_REPO):latest -f docker/Dockerfile .
 
       echo "Tagging Docker image"
-      docker tag $ECR_REPO:latest \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+      docker tag $(ECR_REPO):latest \
+        $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest
 
       echo "Pushing Docker image to ECR"
       docker push \
-        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest
+        $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO):latest
 
 # =====================================================
-# 2️⃣ Configure kubectl for EKS (AWS official way)
+# 2️⃣ Configure kubectl for EKS (AWS OFFICIAL METHOD)
 # =====================================================
 - task: AWSCLI@1
   displayName: Configure kubeconfig for EKS
@@ -53,6 +53,7 @@ steps:
     awsSubCommand: update-kubeconfig
     awsArguments: >
       --name $(CLUSTER_NAME)
+      --region $(AWS_REGION)
 
 # =====================================================
 # 3️⃣ Deploy Kubernetes manifests
